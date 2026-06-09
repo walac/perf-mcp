@@ -1,0 +1,29 @@
+__pycache__/
+*.pyc
+.venv/
+dist/
+*.egg-info/
+
+# AI/LLM/Agent tool files
+.claude/
+.claude_output/
+.cursorrules
+.cursor/
+.copilot/
+.github/copilot/
+.aider*
+.codeium/
+.continue/
+.cody/
+.tabnine/
+.codex/
+.gemini/
+.augment/
+CLAUDE.md
+GEMINI.md
+AGENTS.md
+.supermaven/
+.windsurf/
+
+# Pytest
+.pytest_cache/
