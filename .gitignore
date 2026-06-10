@@ -27,3 +27,32 @@ AGENTS.md
 
 # Pytest
 .pytest_cache/
+
+# apogee-managed-begin
+# Apogee lifecycle artifacts (private working state)
+apogee_artifacts/
+
+# Apogee local config (per-developer, not shared)
+.mcp.json
+.design-approved
+
+# Apogee runtime data
+.apogee/
+
+# Governance files (uncomment to untrack)
+# AGENTS.md
+# agent-policies/attribution.md
+# apogee-managed-end
+
+# Apogee IDE configs (developer-local, not committed)
+.cursor/mcp.json
+.cursor/rules/apogee.mdc
+.continue/config.yaml
+.continue/rules/apogee.md
+.opencode/instructions.md
+opencode.json
+.claude/settings.json
+
+.semcode.db/
+agent-policies
+apogee.toml
