@@ -122,6 +122,9 @@ class TestRun:
 
     @pytest.mark.asyncio
     async def test_timeout(self, executor):
+        result = await executor.run(["stat", "--", "sleep", "0"], timeout=5)
+        if result.returncode != 0:
+            pytest.skip("perf stat cannot access hardware counters")
         with pytest.raises(PerfTimeoutError):
             await executor.run(["stat", "--", "sleep", "999"], timeout=1)
 
