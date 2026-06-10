@@ -56,4 +56,5 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
         ),
         options=KVM_OPTIONS,
         output_options=["output"],
+        input_before_subcommand=1,
     )

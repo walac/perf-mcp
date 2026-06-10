@@ -272,6 +272,7 @@ def register_perf_tool(
     output_file_message: str = "Output written to",
     default_output_file: str | None = None,
     required_options: set[str] | None = None,
+    input_before_subcommand: int = 0,
 ) -> None:
     """Register an MCP tool from a declarative PerfOption specification.
 
@@ -300,7 +301,18 @@ def register_perf_tool(
             schema (no default in the generated signature). Use for
             non-input params that are mandatory (e.g. ``{"output"}``
             for inject).
+        input_before_subcommand: When non-zero, place ``--input`` before
+            this index in ``command``. Some perf subcommands (kmem, kvm)
+            require ``--input`` as a top-level flag before the sub-action
+            word (e.g. ``perf kmem -i file stat``, not
+            ``perf kmem stat -i file``).
     """
+    if input_before_subcommand and not (0 < input_before_subcommand < len(command)):
+        raise ValueError(
+            f"input_before_subcommand={input_before_subcommand} "
+            f"must be between 1 and {len(command) - 1}"
+        )
+
     validated_output_params = set(output_options or [])
 
     async def _impl(**kwargs: Any) -> str:
@@ -313,8 +325,15 @@ def register_perf_tool(
             if op in params:
                 params[op] = executor.validate_output_path(params[op])
 
-        cli_args = options_to_cli_args(options, params)
-        args = list(command) + cli_args
+        if input_before_subcommand and "input" in params:
+            input_val = params.pop("input")
+            input_cli = ["--input", str(input_val)]
+            cli_args = options_to_cli_args(options, params)
+            pos = input_before_subcommand
+            args = list(command[:pos]) + input_cli + list(command[pos:]) + cli_args
+        else:
+            cli_args = options_to_cli_args(options, params)
+            args = list(command) + cli_args
         result = await executor.run(args, input_path=input_path)
 
         if output_file_param and result.returncode == 0:

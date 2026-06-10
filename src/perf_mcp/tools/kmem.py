@@ -50,4 +50,5 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Requires: perf kmem record."
         ),
         options=KMEM_OPTIONS,
+        input_before_subcommand=1,
     )

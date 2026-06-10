@@ -103,7 +103,7 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
         cli_args = options_to_cli_args(DIFF_OPTIONS, params)
         old = executor.validate_input_path(old_input)
         new = executor.validate_input_path(new_input)
-        args = ["diff", "--stdio"] + cli_args + [old, new]
+        args = ["diff"] + cli_args + [old, new]
         result = await executor.run(args)
         return format_result(result)
 

@@ -139,6 +139,142 @@ class TestToolExecution:
         with pytest.raises(Exception):
             await tool.fn(input="/tmp/nonexistent_xyz")
 
+    # -- Tools that produce valid output with the basic test fixture --
+
+    @pytest.mark.asyncio
+    async def test_c2c_report(self, perf_data):
+        tool = self._get_tool("perf_c2c_report")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+        assert "[exit code:" not in result
+
+    @pytest.mark.asyncio
+    async def test_data_convert(self, perf_data, tmp_path):
+        out = str(tmp_path / "output.json")
+        tool = self._get_tool("perf_data_convert")
+        result = await tool.fn(input=perf_data, to_json=out)
+        assert "Converted" in result or "[exit code:" not in result
+
+    @pytest.mark.asyncio
+    async def test_inject(self, perf_data, tmp_path):
+        out = str(tmp_path / "injected.data")
+        tool = self._get_tool("perf_inject")
+        result = await tool.fn(input=perf_data, output=out, build_ids=True)
+        assert "Output written to" in result
+
+    @pytest.mark.asyncio
+    async def test_mem_report(self, perf_data):
+        tool = self._get_tool("perf_mem_report")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_diff(self, perf_data):
+        tool = self._get_tool("perf_diff")
+        result = await tool.fn(old_input=perf_data, new_input=perf_data)
+        assert "[exit code:" not in result
+
+    @pytest.mark.asyncio
+    async def test_kwork_report(self, perf_data):
+        tool = self._get_tool("perf_kwork_report")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+        assert "[exit code:" not in result
+
+    @pytest.mark.asyncio
+    async def test_kwork_latency(self, perf_data):
+        tool = self._get_tool("perf_kwork_latency")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+        assert "[exit code:" not in result
+
+    @pytest.mark.asyncio
+    async def test_kwork_timehist(self, perf_data):
+        tool = self._get_tool("perf_kwork_timehist")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+        assert "[exit code:" not in result
+
+    @pytest.mark.asyncio
+    async def test_kwork_top(self, perf_data):
+        tool = self._get_tool("perf_kwork_top")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+        assert "[exit code:" not in result
+
+    @pytest.mark.asyncio
+    async def test_sched_latency(self, perf_data):
+        tool = self._get_tool("perf_sched_latency")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+        assert "[exit code:" not in result
+
+    @pytest.mark.asyncio
+    async def test_sched_map(self, perf_data):
+        tool = self._get_tool("perf_sched_map")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_sched_replay(self, perf_data):
+        tool = self._get_tool("perf_sched_replay")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+        assert "[exit code:" not in result
+
+    @pytest.mark.asyncio
+    async def test_sched_script(self, perf_data):
+        tool = self._get_tool("perf_sched_script")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+        assert "[exit code:" not in result
+
+    # -- Tools that need specialized perf data (lock/sched/kmem/kvm/timechart events).
+    # These return error messages with the generic fixture, but verify the
+    # full pipeline executes without crashing. --
+
+    @pytest.mark.asyncio
+    async def test_lock_report(self, perf_data):
+        tool = self._get_tool("perf_lock_report")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_lock_contention(self, perf_data):
+        tool = self._get_tool("perf_lock_contention")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_lock_info(self, perf_data):
+        tool = self._get_tool("perf_lock_info")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_sched_timehist(self, perf_data):
+        tool = self._get_tool("perf_sched_timehist")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_timechart(self, perf_data):
+        tool = self._get_tool("perf_timechart")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_kmem_stat(self, perf_data):
+        tool = self._get_tool("perf_kmem_stat")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_kvm_stat_report(self, perf_data):
+        tool = self._get_tool("perf_kvm_stat_report")
+        result = await tool.fn(input=perf_data)
+        assert len(result) > 0
+
 
 class TestToolRunDispatch:
     """Test the MCP runtime dispatch path (tool.run) which goes through
