@@ -10,14 +10,11 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import PerfOption, register_perf_tool
+from perf_mcp.schema import COMMON_OPTIONS, PerfOption, register_perf_tool
 
-CONVERT_OPTIONS = [
-    PerfOption("input", "i", "string", "Path to perf.data file"),
+CONVERT_OPTIONS = COMMON_OPTIONS + [
     PerfOption("to-json", None, "string", "Convert to JSON format, specify output file path"),
     PerfOption("to-ctf", None, "string", "Convert to CTF format, specify output directory"),
-    PerfOption("verbose", "v", "incr", "Verbosity level", default=0),
-    PerfOption("force", "f", "boolean", "Don't complain, do it"),
     PerfOption("all", None, "boolean", "Convert all events"),
     PerfOption("tod", None, "boolean", "Convert timestamps to wall clock time"),
     PerfOption("time", None, "string", "Time span to convert"),

@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from perf_mcp.executor import PerfExecutor, PerfResult
 
 
-@dataclass
+@dataclass(frozen=True)
 class PerfOption:
     """A single perf CLI option mapped to an MCP tool parameter.
 
@@ -66,6 +66,13 @@ class PerfOption:
         parameter name in the tool's signature.
         """
         return self.long_name.replace("-", "_")
+
+
+COMMON_OPTIONS: list[PerfOption] = [
+    PerfOption("input", "i", "string", "Path to perf.data file"),
+    PerfOption("verbose", "v", "incr", "Verbosity level (0-2)", default=0),
+    PerfOption("force", "f", "boolean", "Don't complain, do it"),
+]
 
 
 def options_to_cli_args(

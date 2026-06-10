@@ -5,12 +5,9 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import PerfOption, register_perf_tool
+from perf_mcp.schema import COMMON_OPTIONS, PerfOption, register_perf_tool
 
-KMEM_OPTIONS = [
-    PerfOption("input", "i", "string", "Path to perf.data file"),
-    PerfOption("verbose", "v", "incr", "Verbosity level", default=0),
-    PerfOption("force", "f", "boolean", "Don't complain, do it"),
+KMEM_OPTIONS = COMMON_OPTIONS + [
     PerfOption("caller", None, "boolean", "Show per-callsite statistics"),
     PerfOption("alloc", None, "boolean", "Show allocation statistics"),
     PerfOption(

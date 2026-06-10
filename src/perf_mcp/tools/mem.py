@@ -8,12 +8,9 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import PerfOption, register_perf_tool
+from perf_mcp.schema import COMMON_OPTIONS, PerfOption, register_perf_tool
 
-MEM_OPTIONS = [
-    PerfOption("input", "i", "string", "Path to perf.data file"),
-    PerfOption("verbose", "v", "incr", "Verbosity level", default=0),
-    PerfOption("force", "f", "boolean", "Don't complain, do it"),
+MEM_OPTIONS = COMMON_OPTIONS + [
     PerfOption("sort", "s", "string", "Sort by key(s)"),
     PerfOption("vmlinux", "k", "string", "vmlinux pathname"),
     PerfOption("cpu", "C", "string", "CPUs to filter"),

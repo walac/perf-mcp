@@ -11,13 +11,10 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import PerfOption, register_perf_tool
+from perf_mcp.schema import COMMON_OPTIONS, PerfOption, register_perf_tool
 
-TIMECHART_OPTIONS = [
-    PerfOption("input", "i", "string", "Path to perf.data file"),
+TIMECHART_OPTIONS = COMMON_OPTIONS + [
     PerfOption("output", "o", "string", "Output SVG file path (default: output.svg)"),
-    PerfOption("verbose", "v", "incr", "Verbosity level", default=0),
-    PerfOption("force", "f", "boolean", "Don't complain, do it"),
     PerfOption("width", "w", "integer", "SVG width in pixels"),
     PerfOption("power-only", "P", "boolean", "Only show CPU power events"),
     PerfOption("tasks-only", "T", "boolean", "Only show task events"),

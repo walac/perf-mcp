@@ -8,12 +8,9 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import PerfOption, register_perf_tool
+from perf_mcp.schema import COMMON_OPTIONS, PerfOption, register_perf_tool
 
-C2C_OPTIONS = [
-    PerfOption("input", "i", "string", "Path to perf.data file"),
-    PerfOption("verbose", "v", "incr", "Verbosity level", default=0),
-    PerfOption("force", "f", "boolean", "Don't complain, do it"),
+C2C_OPTIONS = COMMON_OPTIONS + [
     PerfOption("vmlinux", "k", "string", "vmlinux pathname"),
     PerfOption("display", None, "string", "Display type"),
     PerfOption("coalesce", None, "string", "Coalesce fields (e.g. 'tid,pid,iaddr,dso')"),
