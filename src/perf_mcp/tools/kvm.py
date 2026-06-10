@@ -1,24 +1,11 @@
-"""perf kvm stat report -- KVM virtual machine exit analysis.
-
-Shows VM exit reasons, counts, and time spent per exit type for
-KVM-based virtual machines. Useful for diagnosing virtualization
-overhead (e.g., excessive HLT, I/O, or EPT violation exits).
-
-Requires data from perf kvm stat record.
-"""
+"""perf kvm stat report -- KVM virtual machine exit analysis."""
 
 from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import (
-    enrich_tool_schema,
-    build_params,
-    PerfOption,
-    format_result,
-    options_to_cli_args,
-)
+from perf_mcp.schema import PerfOption, register_perf_tool
 
 KVM_OPTIONS = [
     PerfOption("input", "i", "string", "Path to perf.data.guest file"),
@@ -48,7 +35,11 @@ KVM_OPTIONS = [
 
 
 def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_kvm_stat_report",
+        command=["kvm", "stat", "report"],
         description=(
             "KVM virtual machine exit analysis: shows VM exit reasons, counts, and time per exit type.\n"
             "\n"
@@ -63,36 +54,6 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: exit reason table with count, time, and percentage.\n"
             "Requires: perf kvm stat record."
         ),
+        options=KVM_OPTIONS,
+        output_options=["output"],
     )
-    async def perf_kvm_stat_report(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        vcpu: str | None = None,
-        event: str | None = None,
-        key: str | None = None,
-        cpu: str | None = None,
-        sort: str | None = None,
-        pid: str | None = None,
-        all_cpus: bool = False,
-        display: str | None = None,
-        guest: bool = False,
-        guest_code: bool = False,
-        guestkallsyms: str | None = None,
-        guestmodules: str | None = None,
-        guestmount: str | None = None,
-        guestvmlinux: str | None = None,
-        host: bool = False,
-        mmap_pages: str | None = None,
-        output: str | None = None,
-        proc_map_timeout: int | None = None,
-    ) -> str:
-        params = build_params(locals())
-        if "output" in params:
-            params["output"] = executor.validate_output_path(params["output"])
-        cli_args = options_to_cli_args(KVM_OPTIONS, params)
-        args = ["kvm", "stat", "report"] + cli_args
-        result = await executor.run(args, input_path=input)
-        return format_result(result)
-
-    enrich_tool_schema(mcp, "perf_kvm_stat_report", KVM_OPTIONS)

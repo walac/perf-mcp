@@ -1,29 +1,11 @@
-"""perf sched -- scheduler latency and timeline analysis.
-
-Provides 5 MCP tools for different views of scheduler data:
-- perf_sched_latency: Per-task scheduling latency statistics.
-- perf_sched_timehist: Timestamped context-switch timeline.
-- perf_sched_map: ASCII CPU activity visualization.
-- perf_sched_script: Raw scheduler event dump.
-- perf_sched_replay: Replay scheduling for simulation.
-
-All require data from perf sched record or equivalent tracepoints.
-Options are split across COMMON_SCHED_OPTIONS (shared), LATENCY_OPTIONS,
-TIMEHIST_OPTIONS, and MAP_OPTIONS.
-"""
+"""perf sched -- scheduler latency and timeline analysis."""
 
 from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import (
-    enrich_tool_schema,
-    PerfOption,
-    build_params,
-    format_result,
-    options_to_cli_args,
-)
+from perf_mcp.schema import PerfOption, register_perf_tool
 
 COMMON_SCHED_OPTIONS = [
     PerfOption("input", "i", "string", "Path to perf.data file"),
@@ -79,7 +61,11 @@ MAP_OPTIONS = COMMON_SCHED_OPTIONS + [
 def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
     """Register all 5 perf sched MCP tools."""
 
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_sched_latency",
+        command=["sched", "latency"],
         description=(
             "Per-task scheduling latency statistics. Shows max, average, and total scheduling delay per task.\n"
             "\n"
@@ -92,34 +78,15 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: table with task name, max latency, avg latency, switch count.\n"
             "Requires: perf sched record."
         ),
+        options=LATENCY_OPTIONS,
+        output_options=["output"],
     )
-    async def perf_sched_latency(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        cpu: str | None = None,
-        sort: str | None = None,
-        pid: str | None = None,
-        output: str | None = None,
-        prio: str | None = None,
-        repeat: int | None = None,
-        tid: str | None = None,
-        dump_raw_trace: bool = False,
-        kallsyms: str | None = None,
-        symfs: str | None = None,
-        vmlinux: str | None = None,
-    ) -> str:
-        params = build_params(locals())
-        if "output" in params:
-            params["output"] = executor.validate_output_path(params["output"])
-        return format_result(
-            await executor.run(
-                ["sched", "latency"] + options_to_cli_args(LATENCY_OPTIONS, params),
-                input_path=input,
-            )
-        )
 
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_sched_timehist",
+        command=["sched", "timehist"],
         description=(
             "Timestamped scheduler timeline showing every context switch with runtime and scheduling delay.\n"
             "\n"
@@ -139,43 +106,14 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: per-event table with timestamp, task, runtime, wait-time, scheduling delay.\n"
             "Requires: perf sched record."
         ),
+        options=TIMEHIST_OPTIONS,
     )
-    async def perf_sched_timehist(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        cpu: str | None = None,
-        summary: bool = False,
-        wakeups: bool = False,
-        migrations: bool = False,
-        idle_hist: bool = False,
-        state: bool = False,
-        next: bool = False,
-        call_graph: str | None = None,
-        max_stack: int | None = None,
-        pid: str | None = None,
-        comms: str | None = None,
-        time: str | None = None,
-        ns: bool = False,
-        show_prio: bool = False,
-        pre_migrations: bool = False,
-        with_summary: bool = False,
-        cpu_visual: bool = False,
-        tid: str | None = None,
-        dump_raw_trace: bool = False,
-        kallsyms: str | None = None,
-        symfs: str | None = None,
-        vmlinux: str | None = None,
-    ) -> str:
-        params = build_params(locals())
-        return format_result(
-            await executor.run(
-                ["sched", "timehist"] + options_to_cli_args(TIMEHIST_OPTIONS, params),
-                input_path=input,
-            )
-        )
 
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_sched_map",
+        command=["sched", "map"],
         description=(
             "ASCII CPU activity map showing which task ran on which CPU at each time slice.\n"
             "\n"
@@ -190,32 +128,14 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: ASCII grid with CPUs as rows and time as columns.\n"
             "Requires: perf sched record."
         ),
+        options=MAP_OPTIONS,
     )
-    async def perf_sched_map(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        cpu: str | None = None,
-        compact: bool = False,
-        color_pids: str | None = None,
-        color_cpus: str | None = None,
-        task_name: str | None = None,
-        fuzzy_name: str | None = None,
-        cpus: str | None = None,
-        pids: str | None = None,
-        dump_raw_trace: bool = False,
-        kallsyms: str | None = None,
-        symfs: str | None = None,
-        vmlinux: str | None = None,
-    ) -> str:
-        params = build_params(locals())
-        return format_result(
-            await executor.run(
-                ["sched", "map"] + options_to_cli_args(MAP_OPTIONS, params), input_path=input
-            )
-        )
 
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_sched_script",
+        command=["sched", "script"],
         description=(
             "Dump raw scheduler tracepoint events from perf.data.\n"
             "\n"
@@ -224,26 +144,14 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: raw tracepoint event lines.\n"
             "Requires: perf sched record."
         ),
+        options=COMMON_SCHED_OPTIONS,
     )
-    async def perf_sched_script(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        cpu: str | None = None,
-        dump_raw_trace: bool = False,
-        kallsyms: str | None = None,
-        symfs: str | None = None,
-        vmlinux: str | None = None,
-    ) -> str:
-        params = build_params(locals())
-        return format_result(
-            await executor.run(
-                ["sched", "script"] + options_to_cli_args(COMMON_SCHED_OPTIONS, params),
-                input_path=input,
-            )
-        )
 
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_sched_replay",
+        command=["sched", "replay"],
         description=(
             "Replay recorded scheduler events to simulate the original scheduling.\n"
             "\n"
@@ -252,27 +160,5 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: replay statistics (throughput, latency).\n"
             "Requires: perf sched record."
         ),
+        options=COMMON_SCHED_OPTIONS,
     )
-    async def perf_sched_replay(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        cpu: str | None = None,
-        dump_raw_trace: bool = False,
-        kallsyms: str | None = None,
-        symfs: str | None = None,
-        vmlinux: str | None = None,
-    ) -> str:
-        params = build_params(locals())
-        return format_result(
-            await executor.run(
-                ["sched", "replay"] + options_to_cli_args(COMMON_SCHED_OPTIONS, params),
-                input_path=input,
-            )
-        )
-
-    enrich_tool_schema(mcp, "perf_sched_latency", LATENCY_OPTIONS)
-    enrich_tool_schema(mcp, "perf_sched_timehist", TIMEHIST_OPTIONS)
-    enrich_tool_schema(mcp, "perf_sched_map", MAP_OPTIONS)
-    enrich_tool_schema(mcp, "perf_sched_script", COMMON_SCHED_OPTIONS)
-    enrich_tool_schema(mcp, "perf_sched_replay", COMMON_SCHED_OPTIONS)

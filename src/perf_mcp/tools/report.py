@@ -1,12 +1,8 @@
 """perf report -- histogram-based profiling analysis.
 
-The most commonly used perf analysis command. Reads sampling data from
-perf.data and produces an overhead histogram showing which functions,
-DSOs, or source lines consumed the most CPU time (or other events).
-Supports callchain analysis, branch profiling, memory access profiling,
-and latency-centric views.
-
-Forces --stdio output (no TUI) for MCP compatibility.
+Forces --stdio output (no TUI) for MCP compatibility. The --objdump
+and --addr2line options are excluded because they execute arbitrary
+binaries.
 """
 
 from __future__ import annotations
@@ -14,13 +10,7 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import (
-    enrich_tool_schema,
-    build_params,
-    PerfOption,
-    format_result,
-    options_to_cli_args,
-)
+from perf_mcp.schema import PerfOption, register_perf_tool
 
 REPORT_OPTIONS = [
     PerfOption("input", "i", "string", "Path to perf.data file"),
@@ -140,7 +130,11 @@ REPORT_OPTIONS = [
 
 
 def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_report",
+        command=["report", "--stdio"],
         description=(
             "Histogram profiling: shows which functions consumed the most CPU time (or other events) as a ranked overhead table.\n"
             "\n"
@@ -162,85 +156,5 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: table with columns like '% overhead | command | DSO | symbol'.\n"
             "Works on any perf.data from perf record."
         ),
+        options=REPORT_OPTIONS,
     )
-    async def perf_report(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        sort: str | None = None,
-        fields: str | None = None,
-        call_graph: str | None = None,
-        children: bool | None = None,
-        max_stack: int | None = None,
-        header: bool = False,
-        header_only: bool = False,
-        percent_limit: float | None = None,
-        percentage: str | None = None,
-        group: bool = False,
-        group_sort_idx: int | None = None,
-        branch_stack: bool = False,
-        branch_history: bool = False,
-        mem_mode: bool = False,
-        time: str | None = None,
-        inline: bool = False,
-        hierarchy: bool = False,
-        symbol_filter: str | None = None,
-        dsos: str | None = None,
-        comms: str | None = None,
-        pid: str | None = None,
-        tid: str | None = None,
-        symbols: str | None = None,
-        vmlinux: str | None = None,
-        kallsyms: str | None = None,
-        modules: bool = False,
-        hide_unresolved: bool = False,
-        cpu: str | None = None,
-        disassembler_style: str | None = None,
-        source: bool | None = None,
-        asm_raw: bool = False,
-        dump_raw_trace: bool = False,
-        stats: bool = False,
-        tasks: bool = False,
-        mmaps: bool = False,
-        show_nr_samples: bool = False,
-        show_total_period: bool = False,
-        raw_trace: bool = False,
-        itrace: str | None = None,
-        stitch_lbr: bool = False,
-        socket_filter: int | None = None,
-        skip_empty: bool | None = None,
-        total_cycles: bool = False,
-        disable_order: bool = False,
-        latency: bool = False,
-        demangle: bool | None = None,
-        demangle_kernel: bool = False,
-        symfs: str | None = None,
-        percent_type: str | None = None,
-        ns: bool = False,
-        time_quantum: str | None = None,
-        show_ref_call_graph: bool = False,
-        prefix: str | None = None,
-        prefix_strip: str | None = None,
-        samples: int | None = None,
-        parallelism: str | None = None,
-        column_widths: str | None = None,
-        field_separator: str | None = None,
-        parent: str | None = None,
-        exclude_other: bool = False,
-        show_cpu_utilization: bool = False,
-        inverted: bool = False,
-        ignore_callees: str | None = None,
-        ignore_vmlinux: bool = False,
-        show_info: bool = False,
-        quiet: bool = False,
-        pretty: str | None = None,
-        threads: bool = False,
-        full_source_path: bool = False,
-    ) -> str:
-        params = build_params(locals())
-        cli_args = options_to_cli_args(REPORT_OPTIONS, params)
-        args = ["report", "--stdio"] + cli_args
-        result = await executor.run(args, input_path=input)
-        return format_result(result)
-
-    enrich_tool_schema(mcp, "perf_report", REPORT_OPTIONS)

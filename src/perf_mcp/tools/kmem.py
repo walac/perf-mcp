@@ -1,24 +1,11 @@
-"""perf kmem stat -- kernel memory allocation analysis.
-
-Shows slab and page allocator statistics: allocation counts, sizes,
-fragmentation, and per-callsite breakdowns. Can identify memory leaks
-via the live option (shows allocations not yet freed).
-
-Requires data from perf kmem record.
-"""
+"""perf kmem stat -- kernel memory allocation analysis."""
 
 from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import (
-    enrich_tool_schema,
-    build_params,
-    PerfOption,
-    format_result,
-    options_to_cli_args,
-)
+from perf_mcp.schema import PerfOption, register_perf_tool
 
 KMEM_OPTIONS = [
     PerfOption("input", "i", "string", "Path to perf.data file"),
@@ -42,7 +29,11 @@ KMEM_OPTIONS = [
 
 
 def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_kmem_stat",
+        command=["kmem", "stat"],
         description=(
             "Kernel memory allocation statistics: slab and page allocator activity with per-callsite breakdown.\n"
             "\n"
@@ -58,25 +49,5 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: allocation statistics table.\n"
             "Requires: perf kmem record."
         ),
+        options=KMEM_OPTIONS,
     )
-    async def perf_kmem_stat(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        caller: bool = False,
-        alloc: bool = False,
-        sort: str | None = None,
-        line: int | None = None,
-        raw_ip: bool = False,
-        slab: bool = False,
-        page: bool = False,
-        live: bool = False,
-        time: str | None = None,
-    ) -> str:
-        params = build_params(locals())
-        cli_args = options_to_cli_args(KMEM_OPTIONS, params)
-        args = ["kmem", "stat"] + cli_args
-        result = await executor.run(args, input_path=input)
-        return format_result(result)
-
-    enrich_tool_schema(mcp, "perf_kmem_stat", KMEM_OPTIONS)

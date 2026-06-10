@@ -1,11 +1,7 @@
 """perf script -- dump raw per-sample event data.
 
-Outputs one line per sample event with configurable fields (comm, pid,
-tid, timestamp, IP, symbol, DSO, etc.). The raw output is useful for
-custom analysis, flamegraph generation, and detailed event inspection.
-
-Dangerous options (--script, --dlfilter, --gen-script) are excluded
-as they execute arbitrary code.
+The --script, --dlfilter, and --gen-script options are excluded
+because they execute arbitrary code.
 """
 
 from __future__ import annotations
@@ -13,13 +9,7 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import (
-    enrich_tool_schema,
-    build_params,
-    PerfOption,
-    format_result,
-    options_to_cli_args,
-)
+from perf_mcp.schema import PerfOption, register_perf_tool
 
 SCRIPT_OPTIONS = [
     PerfOption("input", "i", "string", "Path to perf.data file"),
@@ -98,7 +88,11 @@ SCRIPT_OPTIONS = [
 
 
 def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_script",
+        command=["script"],
         description=(
             "Dump raw per-sample events from perf.data. Each line is one sample with configurable fields.\n"
             "\n"
@@ -120,71 +114,5 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: one line per sample. Format depends on fields parameter.\n"
             "Works on any perf.data from perf record."
         ),
+        options=SCRIPT_OPTIONS,
     )
-    async def perf_script(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        fields: str | None = None,
-        cpu: str | None = None,
-        comms: str | None = None,
-        pid: str | None = None,
-        tid: str | None = None,
-        symbols: str | None = None,
-        dsos: str | None = None,
-        time: str | None = None,
-        vmlinux: str | None = None,
-        kallsyms: str | None = None,
-        symfs: str | None = None,
-        max_stack: int | None = None,
-        show_task_events: bool = False,
-        show_mmap_events: bool = False,
-        show_switch_events: bool = False,
-        show_namespace_events: bool = False,
-        show_lost_events: bool = False,
-        show_round_events: bool = False,
-        show_bpf_events: bool = False,
-        show_cgroup_events: bool = False,
-        show_text_poke_events: bool = False,
-        header: bool = False,
-        header_only: bool = False,
-        itrace: str | None = None,
-        stitch_lbr: bool = False,
-        full_source_path: bool = False,
-        demangle: bool | None = None,
-        demangle_kernel: bool = False,
-        ns: bool = False,
-        reltime: bool = False,
-        deltatime: bool = False,
-        per_event_dump: bool = False,
-        hide_call_graph: bool = False,
-        max_events: int | None = None,
-        inline: bool = False,
-        Latency: bool = False,
-        addr_range: str | None = None,
-        all_cpus: bool = False,
-        call_ret_trace: bool = False,
-        call_trace: bool = False,
-        dump_raw_trace: bool = False,
-        graph_function: str | None = None,
-        guest_code: bool = False,
-        guestkallsyms: str | None = None,
-        guestmodules: str | None = None,
-        guestmount: str | None = None,
-        guestvmlinux: str | None = None,
-        insn_trace: bool = False,
-        max_blocks: int | None = None,
-        merge_callchains: bool = False,
-        show_info: bool = False,
-        show_kernel_path: bool = False,
-        stop_bt: str | None = None,
-        xed: bool = False,
-    ) -> str:
-        params = build_params(locals())
-
-        cli_args = options_to_cli_args(SCRIPT_OPTIONS, params)
-        args = ["script"] + cli_args
-        result = await executor.run(args, input_path=input)
-        return format_result(result)
-
-    enrich_tool_schema(mcp, "perf_script", SCRIPT_OPTIONS)

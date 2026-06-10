@@ -1,9 +1,5 @@
 """perf c2c report -- cache-to-cache (false sharing) analysis.
 
-Analyzes HITM (Hit Modified) cache events to identify cache lines
-with cross-core contention. Requires memory data recording
-(perf record -d -a).
-
 Forces --stdio output.
 """
 
@@ -12,13 +8,7 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import (
-    enrich_tool_schema,
-    build_params,
-    PerfOption,
-    format_result,
-    options_to_cli_args,
-)
+from perf_mcp.schema import PerfOption, register_perf_tool
 
 C2C_OPTIONS = [
     PerfOption("input", "i", "string", "Path to perf.data file"),
@@ -46,7 +36,11 @@ C2C_OPTIONS = [
 
 
 def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_c2c_report",
+        command=["c2c", "report", "--stdio"],
         description=(
             "Cache-to-cache false sharing analysis. Identifies cache lines with the most HITM (Hit Modified) events — the primary indicator of cross-core cache contention.\n"
             "\n"
@@ -61,35 +55,5 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: multi-section report — shared data cache line table, per-cacheline detail with offsets and symbols.\n"
             "Requires: perf record -d -a (with memory data recording)."
         ),
+        options=C2C_OPTIONS,
     )
-    async def perf_c2c_report(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        vmlinux: str | None = None,
-        display: str | None = None,
-        coalesce: str | None = None,
-        sort: str | None = None,
-        call_graph: str | None = None,
-        node_info: str | None = None,
-        full_symbols: bool = False,
-        no_source: bool = False,
-        show_all: bool = False,
-        stats: bool = False,
-        cpu: str | None = None,
-        all_kernel: bool = False,
-        all_user: bool = False,
-        disassembler_style: str | None = None,
-        double_cl: bool = False,
-        event: str | None = None,
-        ldlat: int | None = None,
-        stitch_lbr: bool = False,
-    ) -> str:
-        params = build_params(locals())
-
-        cli_args = options_to_cli_args(C2C_OPTIONS, params)
-        args = ["c2c", "report", "--stdio"] + cli_args
-        result = await executor.run(args, input_path=input)
-        return format_result(result)
-
-    enrich_tool_schema(mcp, "perf_c2c_report", C2C_OPTIONS)

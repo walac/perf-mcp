@@ -1,27 +1,31 @@
-"""Declarative option definitions and converters for perf CLI tools.
+"""Declarative option definitions, converters, and tool factory for perf CLI tools.
 
 This module defines the mapping between perf CLI options (as declared by
 OPT_* macros in the perf C source) and the MCP tool parameters exposed
-to LLMs. The pipeline is:
+to LLMs. Two registration paths exist:
+
+**Factory path** (preferred for most tools)::
+
+    register_perf_tool(mcp, executor,
+        tool_name="perf_report", command=["report", "--stdio"],
+        description="...", options=REPORT_OPTIONS)
+
+**Manual path** (for tools with unique argument handling, e.g. diff, kallsyms)::
 
     PerfOption list  -->  function signature  -->  build_params(locals())
          |                                              |
          v                                              v
     options_to_cli_args(OPTIONS, params)  -->  ["--sort", "comm", ...]
-
-Each tool module declares a list of PerfOption objects describing every
-supported CLI flag. At runtime, build_params() captures the function's
-local variables (the MCP parameter values), and options_to_cli_args()
-converts them to the CLI argument list passed to the perf subprocess.
 """
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from perf_mcp.executor import PerfResult
+    from perf_mcp.executor import PerfExecutor, PerfResult
 
 
 @dataclass
@@ -125,8 +129,9 @@ def build_params(
 ) -> dict[str, Any]:
     """Extract tool parameters from a function's locals() dict.
 
-    Called as ``build_params(locals())`` inside each tool function to
-    capture the MCP parameter values. Filters out:
+    Used by manually registered tools (diff, kallsyms) that cannot use
+    ``register_perf_tool()``. Called as ``build_params(locals())`` inside
+    each tool function to capture the MCP parameter values. Filters out:
     - ``"self"`` (from closures)
     - Any keys in ``exclude`` (e.g. ``{"old_input", "new_input"}`` in diff)
     - ``None`` values (parameters not provided by the caller)
@@ -160,7 +165,8 @@ def enrich_tool_schema(
     FastMCP generates parameter schemas from function signatures, but plain
     Python type annotations don't carry descriptions. This function adds
     the ``description`` field to each parameter in the tool's schema by
-    matching PerfOption.param_name to the schema property names.
+    matching PerfOption.param_name to the schema property names. Used by
+    both ``register_perf_tool()`` and manually registered tools (diff).
 
     Must be called AFTER the tool function is registered via @mcp.tool().
 
@@ -179,6 +185,164 @@ def enrich_tool_schema(
     for param_name, prop in props.items():
         if "description" not in prop and param_name in option_map:
             prop["description"] = option_map[param_name].description
+
+
+def _build_handler_signature(
+    options: list[PerfOption],
+    *,
+    has_input: bool = True,
+    required_options: set[str] | None = None,
+) -> str:
+    """Generate a Python function parameter string from a PerfOption list.
+
+    Produces a signature like ``input: str, verbose: int = 0, force: bool = False``
+    that FastMCP can introspect via pydantic to build a valid argument model.
+    Required params (no default) must come before optional ones.
+    """
+    must_require = required_options or set()
+    required_params: list[str] = []
+    optional_params: list[str] = []
+    seen_input = False
+
+    for opt in options:
+        name = opt.param_name
+        if has_input and name == "input":
+            required_params.append(f"{name}: str")
+            seen_input = True
+            continue
+
+        is_required = name in must_require
+
+        match opt.param_type:
+            case "boolean":
+                if is_required:
+                    required_params.append(f"{name}: bool")
+                elif opt.negatable or opt.default is not None:
+                    # Negatable booleans and booleans with explicit defaults
+                    # (like skip-empty default=True) use Optional so omitting
+                    # the param sends None → no flag emitted. The PerfOption
+                    # default is schema metadata only, not a Python default.
+                    optional_params.append(f"{name}: bool | None = None")
+                else:
+                    optional_params.append(f"{name}: bool = False")
+            case "string":
+                if is_required:
+                    required_params.append(f"{name}: str")
+                elif opt.default is not None:
+                    optional_params.append(f"{name}: str = {opt.default!r}")
+                else:
+                    optional_params.append(f"{name}: str | None = None")
+            case "integer":
+                if is_required:
+                    required_params.append(f"{name}: int")
+                elif opt.default is not None:
+                    optional_params.append(f"{name}: int = {opt.default!r}")
+                else:
+                    optional_params.append(f"{name}: int | None = None")
+            case "float":
+                if is_required:
+                    required_params.append(f"{name}: float")
+                elif opt.default is not None:
+                    optional_params.append(f"{name}: float = {opt.default!r}")
+                else:
+                    optional_params.append(f"{name}: float | None = None")
+            case "incr":
+                if is_required:
+                    required_params.append(f"{name}: int")
+                else:
+                    optional_params.append(f"{name}: int = {opt.default or 0}")
+
+    if has_input and not seen_input:
+        required_params.insert(0, "input: str")
+
+    return ", ".join(required_params + optional_params)
+
+
+def register_perf_tool(
+    mcp: Any,
+    executor: PerfExecutor,
+    *,
+    tool_name: str,
+    command: list[str],
+    description: str,
+    options: list[PerfOption],
+    has_input: bool = True,
+    output_options: list[str] | None = None,
+    output_file_param: str | None = None,
+    output_file_message: str = "Output written to",
+    default_output_file: str | None = None,
+    required_options: set[str] | None = None,
+) -> None:
+    """Register an MCP tool from a declarative PerfOption specification.
+
+    This factory generates an async handler with an explicit parameter
+    signature (required for FastMCP's pydantic validation), registers it,
+    and enriches the JSON Schema with descriptions from the PerfOption list.
+
+    Args:
+        mcp: The FastMCP server instance.
+        executor: The shared PerfExecutor.
+        tool_name: MCP tool name (e.g. ``"perf_report"``).
+        command: perf subcommand args (e.g. ``["report", "--stdio"]``).
+        description: Tool description shown to the LLM.
+        options: The PerfOption list defining CLI flags.
+        has_input: If True, adds a required ``input`` parameter that
+            gets validated via ``executor.validate_input_path()``.
+        output_options: Parameter names whose values need output path
+            validation (e.g. ``["output"]``, ``["to_json", "to_ctf"]``).
+        output_file_param: If set, on success returns the output file's
+            path and size instead of perf's stdout. Used by inject/timechart.
+        output_file_message: Prefix for the success message when
+            ``output_file_param`` is set (e.g. ``"Timechart written to"``).
+        default_output_file: Default output filename when output_file_param
+            is optional (e.g. ``"output.svg"`` for timechart).
+        required_options: Option param_names that must be required in the
+            schema (no default in the generated signature). Use for
+            non-input params that are mandatory (e.g. ``{"output"}``
+            for inject).
+    """
+    validated_output_params = set(output_options or [])
+
+    async def _impl(**kwargs: Any) -> str:
+        input_path = kwargs.get("input") if has_input else None
+        params = {k: v for k, v in kwargs.items() if v is not None}
+        if params.get("verbose") == 0:
+            del params["verbose"]
+
+        for op in validated_output_params:
+            if op in params:
+                params[op] = executor.validate_output_path(params[op])
+
+        cli_args = options_to_cli_args(options, params)
+        args = list(command) + cli_args
+        result = await executor.run(args, input_path=input_path)
+
+        if output_file_param and result.returncode == 0:
+            out_path = params.get(output_file_param, default_output_file)
+            if out_path:
+                try:
+                    size = os.path.getsize(out_path)
+                    return f"{output_file_message}: {out_path} ({size} bytes)"
+                except OSError:
+                    pass
+
+        return format_result(result)
+
+    sig = _build_handler_signature(
+        options,
+        has_input=has_input,
+        required_options=required_options,
+    )
+    fn_code = (
+        f"async def {tool_name}({sig}) -> str:\n"
+        f"    return await _impl(**{{k: v for k, v in locals().items()}})\n"
+    )
+    ns: dict[str, Any] = {"_impl": _impl}
+    exec(fn_code, ns)  # noqa: S102
+    handler = ns[tool_name]
+
+    mcp.tool(name=tool_name, description=description)(handler)
+    enrich_tool_schema(mcp, tool_name, options)
 
 
 def format_result(result: PerfResult) -> str:

@@ -140,6 +140,37 @@ class TestToolExecution:
             await tool.fn(input="/tmp/nonexistent_xyz")
 
 
+class TestToolRunDispatch:
+    """Test the MCP runtime dispatch path (tool.run) which goes through
+    pydantic validation, unlike tool.fn() used in other tests."""
+
+    @pytest.fixture(autouse=True)
+    def register(self):
+        _register_all_tools()
+
+    def _get_tool(self, name: str):
+        return mcp._tool_manager._tools[name]
+
+    @pytest.mark.asyncio
+    async def test_evlist_via_run(self, perf_data):
+        tool = self._get_tool("perf_evlist")
+        result = await tool.run({"input": perf_data})
+        assert "cycles" in str(result)
+
+    @pytest.mark.asyncio
+    async def test_report_via_run(self, perf_data):
+        tool = self._get_tool("perf_report")
+        result = await tool.run({"input": perf_data, "header_only": True})
+        text = str(result).lower()
+        assert "captured" in text or "hostname" in text or "cmdline" in text
+
+    @pytest.mark.asyncio
+    async def test_kallsyms_via_run(self):
+        tool = self._get_tool("perf_kallsyms")
+        result = await tool.run({"symbol": "schedule"})
+        assert len(str(result)) > 0
+
+
 class TestFormatResult:
     def test_success(self):
         from perf_mcp.executor import PerfResult

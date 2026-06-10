@@ -10,18 +10,10 @@ path is validated against BLOCKED_PREFIXES before execution.
 
 from __future__ import annotations
 
-import os
-
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import (
-    enrich_tool_schema,
-    build_params,
-    PerfOption,
-    format_result,
-    options_to_cli_args,
-)
+from perf_mcp.schema import PerfOption, register_perf_tool
 
 INJECT_OPTIONS = [
     PerfOption("input", "i", "string", "Path to input perf.data file"),
@@ -50,7 +42,11 @@ INJECT_OPTIONS = [
 
 
 def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_inject",
+        command=["inject"],
         description=(
             "Transform a perf.data file: inject build IDs, decode hardware traces, merge scheduler events, or process JIT data. Writes a new perf.data.\n"
             "\n"
@@ -70,42 +66,8 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "\n"
             "Output: writes a new perf.data file, returns path and size."
         ),
+        options=INJECT_OPTIONS,
+        output_options=["output"],
+        output_file_param="output",
+        required_options={"output"},
     )
-    async def perf_inject(
-        input: str,
-        output: str,
-        verbose: int = 0,
-        force: bool = False,
-        build_ids: bool = False,
-        sched_stat: bool = False,
-        jit: bool = False,
-        itrace: str | None = None,
-        strip: bool = False,
-        vm_time_correlation: str | None = None,
-        guest_data: str | None = None,
-        buildid_all: bool = False,
-        convert_callchain: bool = False,
-        guestmount: str | None = None,
-        ignore_vmlinux: bool = False,
-        kallsyms: str | None = None,
-        known_build_ids: str | None = None,
-        mmap2_buildid_all: bool = False,
-        mmap2_buildids: bool = False,
-        vmlinux: str | None = None,
-    ) -> str:
-        params = build_params(locals())
-
-        validated_output = executor.validate_output_path(output)
-        params["output"] = validated_output
-        cli_args = options_to_cli_args(INJECT_OPTIONS, params)
-        args = ["inject"] + cli_args
-        result = await executor.run(args, input_path=input)
-        if result.returncode == 0:
-            try:
-                size = os.path.getsize(validated_output)
-                return f"Output written to: {validated_output} ({size} bytes)"
-            except OSError:
-                return format_result(result)
-        return format_result(result)
-
-    enrich_tool_schema(mcp, "perf_inject", INJECT_OPTIONS)

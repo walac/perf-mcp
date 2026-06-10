@@ -8,18 +8,10 @@ Requires data from perf timechart record.
 
 from __future__ import annotations
 
-import os
-
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import (
-    enrich_tool_schema,
-    build_params,
-    PerfOption,
-    format_result,
-    options_to_cli_args,
-)
+from perf_mcp.schema import PerfOption, register_perf_tool
 
 TIMECHART_OPTIONS = [
     PerfOption("input", "i", "string", "Path to perf.data file"),
@@ -43,7 +35,11 @@ TIMECHART_OPTIONS = [
 
 
 def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_timechart",
+        command=["timechart"],
         description=(
             "Generate a timechart SVG showing CPU activity and task scheduling over time as a visual timeline.\n"
             "\n"
@@ -59,39 +55,9 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: returns the SVG file path and size.\n"
             "Requires: perf timechart record."
         ),
+        options=TIMECHART_OPTIONS,
+        output_options=["output"],
+        output_file_param="output",
+        output_file_message="Timechart written to",
+        default_output_file="output.svg",
     )
-    async def perf_timechart(
-        input: str,
-        output: str | None = None,
-        verbose: int = 0,
-        force: bool = False,
-        width: int | None = None,
-        power_only: bool = False,
-        tasks_only: bool = False,
-        process: str | None = None,
-        io_skip_eagain: bool = False,
-        io_min_time: int | None = None,
-        io_merge_dist: int | None = None,
-        highlight: str | None = None,
-        topology: bool = False,
-        callchain: bool = False,
-        io_only: bool = False,
-        proc_num: int | None = None,
-        symfs: str | None = None,
-    ) -> str:
-        params = build_params(locals())
-        if output is not None:
-            params["output"] = executor.validate_output_path(output)
-        cli_args = options_to_cli_args(TIMECHART_OPTIONS, params)
-        args = ["timechart"] + cli_args
-        result = await executor.run(args, input_path=input)
-        out_path = params.get("output", "output.svg")
-        if result.returncode == 0:
-            try:
-                size = os.path.getsize(out_path)
-                return f"Timechart written to: {out_path} ({size} bytes)"
-            except OSError:
-                return format_result(result)
-        return format_result(result)
-
-    enrich_tool_schema(mcp, "perf_timechart", TIMECHART_OPTIONS)

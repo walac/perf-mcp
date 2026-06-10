@@ -1,25 +1,11 @@
-"""perf lock -- lock contention analysis.
-
-Provides 3 MCP tools for lock analysis:
-- perf_lock_report: Lock acquire/contention statistics.
-- perf_lock_contention: Detailed contention analysis with BPF.
-- perf_lock_info: Lock type information.
-
-Requires data from perf lock record or lock tracepoints.
-"""
+"""perf lock -- lock contention analysis."""
 
 from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import (
-    enrich_tool_schema,
-    PerfOption,
-    build_params,
-    format_result,
-    options_to_cli_args,
-)
+from perf_mcp.schema import PerfOption, register_perf_tool
 
 COMMON_LOCK_OPTIONS = [
     PerfOption("input", "i", "string", "Path to perf.data file"),
@@ -79,7 +65,11 @@ CONTENTION_OPTIONS = COMMON_LOCK_OPTIONS + [
 def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
     """Register all 3 perf lock MCP tools."""
 
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_lock_report",
+        command=["lock", "report"],
         description=(
             "Lock statistics: acquired count, contended count, and wait times per lock.\n"
             "\n"
@@ -94,36 +84,14 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: per-lock statistics table.\n"
             "Requires: perf lock record or lock tracepoints."
         ),
+        options=REPORT_OPTIONS,
     )
-    async def perf_lock_report(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        cpu: str | None = None,
-        sort: str | None = None,
-        type_filter: str | None = None,
-        lock_filter: str | None = None,
-        threads: bool = False,
-        combine_locks: bool = False,
-        key: str | None = None,
-        field: str | None = None,
-        field_separator: str | None = None,
-        entries: int | None = None,
-        dump_raw_trace: bool = False,
-        kallsyms: str | None = None,
-        vmlinux: str | None = None,
-        quiet: bool = False,
-        pid: str | None = None,
-        tid: str | None = None,
-    ) -> str:
-        params = build_params(locals())
-        return format_result(
-            await executor.run(
-                ["lock", "report"] + options_to_cli_args(REPORT_OPTIONS, params), input_path=input
-            )
-        )
 
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_lock_contention",
+        command=["lock", "contention"],
         description=(
             "Detailed lock contention analysis showing where threads wait for locks, "
             "with optional BPF-based tracking.\n"
@@ -139,49 +107,15 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: contention table with wait times and optional stacks.\n"
             "Requires: perf lock record or lock tracepoints."
         ),
+        options=CONTENTION_OPTIONS,
+        output_options=["output"],
     )
-    async def perf_lock_contention(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        cpu: str | None = None,
-        sort: str | None = None,
-        type_filter: str | None = None,
-        lock_filter: str | None = None,
-        threads: bool = False,
-        combine_locks: bool = False,
-        key: str | None = None,
-        max_stack: int | None = None,
-        map_nr_entries: int | None = None,
-        lock_addr: bool = False,
-        lock_owner: bool = False,
-        all_cpus: bool = False,
-        use_bpf: bool = False,
-        callstack_filter: str | None = None,
-        cgroup_filter: str | None = None,
-        inject_delay: int | None = None,
-        lock_cgroup: bool = False,
-        map: bool = False,
-        output: str | None = None,
-        stack_skip: int | None = None,
-        dump_raw_trace: bool = False,
-        kallsyms: str | None = None,
-        vmlinux: str | None = None,
-        quiet: bool = False,
-        pid: str | None = None,
-        tid: str | None = None,
-    ) -> str:
-        params = build_params(locals())
-        if "output" in params:
-            params["output"] = executor.validate_output_path(params["output"])
-        return format_result(
-            await executor.run(
-                ["lock", "contention"] + options_to_cli_args(CONTENTION_OPTIONS, params),
-                input_path=input,
-            )
-        )
 
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_lock_info",
+        command=["lock", "info"],
         description=(
             "Display general information about locks in perf.data.\n"
             "\n"
@@ -190,27 +124,5 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: lock type and configuration summary.\n"
             "Requires: perf lock record."
         ),
+        options=COMMON_LOCK_OPTIONS,
     )
-    async def perf_lock_info(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        cpu: str | None = None,
-        dump_raw_trace: bool = False,
-        kallsyms: str | None = None,
-        vmlinux: str | None = None,
-        quiet: bool = False,
-        pid: str | None = None,
-        tid: str | None = None,
-    ) -> str:
-        params = build_params(locals())
-        return format_result(
-            await executor.run(
-                ["lock", "info"] + options_to_cli_args(COMMON_LOCK_OPTIONS, params),
-                input_path=input,
-            )
-        )
-
-    enrich_tool_schema(mcp, "perf_lock_report", REPORT_OPTIONS)
-    enrich_tool_schema(mcp, "perf_lock_contention", CONTENTION_OPTIONS)
-    enrich_tool_schema(mcp, "perf_lock_info", COMMON_LOCK_OPTIONS)

@@ -1,22 +1,11 @@
-"""perf buildid-list -- list build IDs in a perf.data file.
-
-Shows the ELF build-id hash and associated DSO path for each binary
-referenced in the profile data. Useful for verifying symbol resolution
-will work on a different machine.
-"""
+"""perf buildid-list -- list build IDs in a perf.data file."""
 
 from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import (
-    enrich_tool_schema,
-    build_params,
-    PerfOption,
-    format_result,
-    options_to_cli_args,
-)
+from perf_mcp.schema import PerfOption, register_perf_tool
 
 BUILDID_OPTIONS = [
     PerfOption("input", "i", "string", "Path to perf.data file"),
@@ -29,7 +18,11 @@ BUILDID_OPTIONS = [
 
 
 def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_buildid_list",
+        command=["buildid-list"],
         description=(
             "List the ELF build-id hashes for binaries referenced in perf.data.\n"
             "\n"
@@ -43,19 +36,5 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: '<build-id-hash> <dso-path>' per line.\n"
             "Works on any perf.data."
         ),
+        options=BUILDID_OPTIONS,
     )
-    async def perf_buildid_list(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        with_hits: bool = False,
-        kernel: bool = False,
-        kernel_maps: bool = False,
-    ) -> str:
-        params = build_params(locals())
-        cli_args = options_to_cli_args(BUILDID_OPTIONS, params)
-        args = ["buildid-list"] + cli_args
-        result = await executor.run(args, input_path=input)
-        return format_result(result)
-
-    enrich_tool_schema(mcp, "perf_buildid_list", BUILDID_OPTIONS)

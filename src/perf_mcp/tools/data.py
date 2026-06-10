@@ -10,13 +10,7 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import (
-    enrich_tool_schema,
-    build_params,
-    PerfOption,
-    format_result,
-    options_to_cli_args,
-)
+from perf_mcp.schema import PerfOption, register_perf_tool
 
 CONVERT_OPTIONS = [
     PerfOption("input", "i", "string", "Path to perf.data file"),
@@ -31,7 +25,11 @@ CONVERT_OPTIONS = [
 
 
 def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_data_convert",
+        command=["data", "convert"],
         description=(
             "Convert perf.data to JSON or CTF (Common Trace Format).\n"
             "\n"
@@ -46,25 +44,6 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Exactly one of to_json or to_ctf must be specified.\n"
             "Output: returns the output file/directory path."
         ),
+        options=CONVERT_OPTIONS,
+        output_options=["to_json", "to_ctf"],
     )
-    async def perf_data_convert(
-        input: str,
-        to_json: str | None = None,
-        to_ctf: str | None = None,
-        verbose: int = 0,
-        force: bool = False,
-        all: bool = False,
-        tod: bool = False,
-        time: str | None = None,
-    ) -> str:
-        params = build_params(locals())
-        if "to_json" in params:
-            params["to_json"] = executor.validate_output_path(params["to_json"])
-        if "to_ctf" in params:
-            params["to_ctf"] = executor.validate_output_path(params["to_ctf"])
-        cli_args = options_to_cli_args(CONVERT_OPTIONS, params)
-        args = ["data", "convert"] + cli_args
-        result = await executor.run(args, input_path=input)
-        return format_result(result)
-
-    enrich_tool_schema(mcp, "perf_data_convert", CONVERT_OPTIONS)

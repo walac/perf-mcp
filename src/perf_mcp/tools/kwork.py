@@ -1,26 +1,11 @@
-"""perf kwork -- kernel work item analysis (IRQ, softirq, workqueue).
-
-Provides 4 MCP tools:
-- perf_kwork_report: Work item statistics.
-- perf_kwork_latency: Latency breakdown.
-- perf_kwork_timehist: Timestamped event timeline.
-- perf_kwork_top: Top work items by runtime.
-
-Requires data from perf kwork record.
-"""
+"""perf kwork -- kernel work item analysis (IRQ, softirq, workqueue)."""
 
 from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import (
-    enrich_tool_schema,
-    PerfOption,
-    build_params,
-    format_result,
-    options_to_cli_args,
-)
+from perf_mcp.schema import PerfOption, register_perf_tool
 
 COMMON_KWORK_OPTIONS = [
     PerfOption("input", "i", "string", "Path to perf.data file"),
@@ -48,7 +33,11 @@ TIMEHIST_OPTIONS = COMMON_KWORK_OPTIONS + [
 def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
     """Register all 4 perf kwork MCP tools."""
 
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_kwork_report",
+        command=["kwork", "report"],
         description=(
             "Kernel work item statistics: IRQ, softIRQ, and workqueue handlers "
             "with count, total runtime, and max latency.\n"
@@ -63,32 +52,14 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: per-handler statistics table.\n"
             "Requires: perf kwork record."
         ),
+        options=COMMON_KWORK_OPTIONS,
     )
-    async def perf_kwork_report(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        cpu: str | None = None,
-        name: str | None = None,
-        time: str | None = None,
-        sort: str | None = None,
-        dump_raw_trace: bool = False,
-        kallsyms: str | None = None,
-        kwork: str | None = None,
-        symfs: str | None = None,
-        use_bpf: bool = False,
-        vmlinux: str | None = None,
-        with_summary: bool = False,
-    ) -> str:
-        params = build_params(locals())
-        return format_result(
-            await executor.run(
-                ["kwork", "report"] + options_to_cli_args(COMMON_KWORK_OPTIONS, params),
-                input_path=input,
-            )
-        )
 
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_kwork_latency",
+        command=["kwork", "latency"],
         description=(
             "Kernel work item latency breakdown showing scheduling delay for each handler.\n"
             "\n"
@@ -100,32 +71,14 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: per-handler latency table.\n"
             "Requires: perf kwork record."
         ),
+        options=COMMON_KWORK_OPTIONS,
     )
-    async def perf_kwork_latency(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        cpu: str | None = None,
-        name: str | None = None,
-        time: str | None = None,
-        sort: str | None = None,
-        dump_raw_trace: bool = False,
-        kallsyms: str | None = None,
-        kwork: str | None = None,
-        symfs: str | None = None,
-        use_bpf: bool = False,
-        vmlinux: str | None = None,
-        with_summary: bool = False,
-    ) -> str:
-        params = build_params(locals())
-        return format_result(
-            await executor.run(
-                ["kwork", "latency"] + options_to_cli_args(COMMON_KWORK_OPTIONS, params),
-                input_path=input,
-            )
-        )
 
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_kwork_timehist",
+        command=["kwork", "timehist"],
         description=(
             "Timestamped kernel work item events showing when each handler ran and for how long.\n"
             "\n"
@@ -136,34 +89,14 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: per-event timeline.\n"
             "Requires: perf kwork record."
         ),
+        options=TIMEHIST_OPTIONS,
     )
-    async def perf_kwork_timehist(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        cpu: str | None = None,
-        name: str | None = None,
-        time: str | None = None,
-        sort: str | None = None,
-        call_graph: str | None = None,
-        max_stack: int | None = None,
-        dump_raw_trace: bool = False,
-        kallsyms: str | None = None,
-        kwork: str | None = None,
-        symfs: str | None = None,
-        use_bpf: bool = False,
-        vmlinux: str | None = None,
-        with_summary: bool = False,
-    ) -> str:
-        params = build_params(locals())
-        return format_result(
-            await executor.run(
-                ["kwork", "timehist"] + options_to_cli_args(TIMEHIST_OPTIONS, params),
-                input_path=input,
-            )
-        )
 
-    @mcp.tool(
+    register_perf_tool(
+        mcp,
+        executor,
+        tool_name="perf_kwork_top",
+        command=["kwork", "top"],
         description=(
             "Top kernel work items ranked by total runtime.\n"
             "\n"
@@ -175,32 +108,5 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
             "Output: ranked handler list.\n"
             "Requires: perf kwork record."
         ),
+        options=COMMON_KWORK_OPTIONS,
     )
-    async def perf_kwork_top(
-        input: str,
-        verbose: int = 0,
-        force: bool = False,
-        cpu: str | None = None,
-        name: str | None = None,
-        time: str | None = None,
-        sort: str | None = None,
-        dump_raw_trace: bool = False,
-        kallsyms: str | None = None,
-        kwork: str | None = None,
-        symfs: str | None = None,
-        use_bpf: bool = False,
-        vmlinux: str | None = None,
-        with_summary: bool = False,
-    ) -> str:
-        params = build_params(locals())
-        return format_result(
-            await executor.run(
-                ["kwork", "top"] + options_to_cli_args(COMMON_KWORK_OPTIONS, params),
-                input_path=input,
-            )
-        )
-
-    enrich_tool_schema(mcp, "perf_kwork_report", COMMON_KWORK_OPTIONS)
-    enrich_tool_schema(mcp, "perf_kwork_latency", COMMON_KWORK_OPTIONS)
-    enrich_tool_schema(mcp, "perf_kwork_timehist", TIMEHIST_OPTIONS)
-    enrich_tool_schema(mcp, "perf_kwork_top", COMMON_KWORK_OPTIONS)
