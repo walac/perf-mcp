@@ -1,14 +1,19 @@
-"""Unit tests for schema.py: PerfOption, options_to_cli_args, build_params.
-
-Tests the core option-to-CLI-argument pipeline that all tool modules depend on.
-Covers every param_type (boolean, string, integer, float, incr), negatable
-booleans, None/missing value handling, hyphenated names, and the build_params
-filtering logic.
+"""Unit tests for schema.py: PerfOption, options_to_cli_args, build_params,
+enrich_tool_schema, and _build_handler_signature.
 """
 
 from __future__ import annotations
 
-from perf_mcp.schema import PerfOption, build_params, options_to_cli_args
+import pytest
+
+from perf_mcp.schema import (
+    COMMON_OPTIONS,
+    PerfOption,
+    _build_handler_signature,
+    build_params,
+    enrich_tool_schema,
+    options_to_cli_args,
+)
 
 
 class TestPerfOption:
@@ -132,3 +137,166 @@ class TestBuildParams:
         assert "old_input" not in params
         assert "new_input" not in params
         assert params["sort"] == "comm"
+
+
+class TestEnrichToolSchema:
+    def _make_mock_tool(self, params):
+        class MockTool:
+            def __init__(self, parameters):
+                self.parameters = parameters
+        return MockTool(params)
+
+    def _make_mock_mcp(self, tool_name, tool):
+        class MockToolManager:
+            def __init__(self):
+                self._tools = {tool_name: tool}
+        class MockMCP:
+            def __init__(self):
+                self._tool_manager = MockToolManager()
+        return MockMCP()
+
+    def test_adds_descriptions(self):
+        tool = self._make_mock_tool({
+            "properties": {"sort": {}, "force": {}},
+        })
+        mcp = self._make_mock_mcp("perf_test", tool)
+        options = [
+            PerfOption("sort", "s", "string", "Sort by key"),
+            PerfOption("force", "f", "boolean", "Don't complain"),
+        ]
+        enrich_tool_schema(mcp, "perf_test", options)
+        assert tool.parameters["properties"]["sort"]["description"] == "Sort by key"
+        assert tool.parameters["properties"]["force"]["description"] == "Don't complain"
+
+    def test_does_not_overwrite_existing_descriptions(self):
+        tool = self._make_mock_tool({
+            "properties": {"sort": {"description": "Custom desc"}},
+        })
+        mcp = self._make_mock_mcp("perf_test", tool)
+        options = [PerfOption("sort", "s", "string", "Sort by key")]
+        enrich_tool_schema(mcp, "perf_test", options)
+        assert tool.parameters["properties"]["sort"]["description"] == "Custom desc"
+
+    def test_missing_tool_is_noop(self):
+        class MockMCP:
+            class _tool_manager:
+                _tools = {}
+        enrich_tool_schema(MockMCP(), "nonexistent", [])
+
+    def test_hyphenated_option_maps_to_param_name(self):
+        tool = self._make_mock_tool({
+            "properties": {"call_graph": {}},
+        })
+        mcp = self._make_mock_mcp("perf_test", tool)
+        options = [PerfOption("call-graph", "g", "string", "Call graph options")]
+        enrich_tool_schema(mcp, "perf_test", options)
+        assert tool.parameters["properties"]["call_graph"]["description"] == "Call graph options"
+
+
+class TestBuildHandlerSignature:
+    def test_basic_signature(self):
+        options = [
+            PerfOption("input", "i", "string", "Path"),
+            PerfOption("verbose", "v", "incr", "Verbosity", default=0),
+            PerfOption("force", "f", "boolean", "Force"),
+        ]
+        sig = _build_handler_signature(options)
+        assert "input: str" in sig
+        assert "verbose: int = 0" in sig
+        assert "force: bool = False" in sig
+
+    def test_negatable_boolean_is_optional(self):
+        options = [
+            PerfOption("children", None, "boolean", "desc", negatable=True, default=True),
+        ]
+        sig = _build_handler_signature(options, has_input=False)
+        assert "children: bool | None = None" in sig
+
+    def test_boolean_with_default_is_optional(self):
+        options = [
+            PerfOption("skip-empty", None, "boolean", "desc", default=True),
+        ]
+        sig = _build_handler_signature(options, has_input=False)
+        assert "skip_empty: bool | None = None" in sig
+
+    def test_required_options_come_first(self):
+        options = [
+            PerfOption("input", "i", "string", "Path"),
+            PerfOption("output", "o", "string", "Output"),
+            PerfOption("verbose", "v", "incr", "Verbosity", default=0),
+        ]
+        sig = _build_handler_signature(options, required_options={"output"})
+        parts = sig.split(", ")
+        req_indices = [i for i, p in enumerate(parts) if "= " not in p]
+        opt_indices = [i for i, p in enumerate(parts) if "= " in p]
+        assert max(req_indices) < min(opt_indices)
+
+    def test_has_input_false(self):
+        options = [
+            PerfOption("symbol", None, "string", "Symbol name"),
+        ]
+        sig = _build_handler_signature(options, has_input=False)
+        assert "input" not in sig
+        assert "symbol: str | None = None" in sig
+
+    def test_string_optional_default(self):
+        options = [
+            PerfOption("sort", "s", "string", "Sort key"),
+        ]
+        sig = _build_handler_signature(options, has_input=False)
+        assert "sort: str | None = None" in sig
+
+    def test_integer_optional_default(self):
+        options = [
+            PerfOption("max-stack", None, "integer", "Max stack"),
+        ]
+        sig = _build_handler_signature(options, has_input=False)
+        assert "max_stack: int | None = None" in sig
+
+    def test_float_optional_default(self):
+        options = [
+            PerfOption("percent-limit", None, "float", "Limit"),
+        ]
+        sig = _build_handler_signature(options, has_input=False)
+        assert "percent_limit: float | None = None" in sig
+
+    def test_string_with_explicit_default(self):
+        options = [
+            PerfOption("sort", "s", "string", "Sort key", default="comm"),
+        ]
+        sig = _build_handler_signature(options, has_input=False)
+        assert "sort: str = 'comm'" in sig
+
+    def test_integer_with_explicit_default(self):
+        options = [
+            PerfOption("max-stack", None, "integer", "Max depth", default=10),
+        ]
+        sig = _build_handler_signature(options, has_input=False)
+        assert "max_stack: int = 10" in sig
+
+    def test_float_with_explicit_default(self):
+        options = [
+            PerfOption("percent-limit", None, "float", "Limit", default=0.5),
+        ]
+        sig = _build_handler_signature(options, has_input=False)
+        assert "percent_limit: float = 0.5" in sig
+
+    def test_input_auto_inserted_when_missing(self):
+        options = [
+            PerfOption("force", "f", "boolean", "Force"),
+        ]
+        sig = _build_handler_signature(options, has_input=True)
+        assert sig.startswith("input: str")
+
+
+class TestCommonOptions:
+    def test_common_options_has_three_entries(self):
+        assert len(COMMON_OPTIONS) == 3
+
+    def test_common_options_param_names(self):
+        names = [o.param_name for o in COMMON_OPTIONS]
+        assert names == ["input", "verbose", "force"]
+
+    def test_frozen_prevents_mutation(self):
+        with pytest.raises(AttributeError):
+            COMMON_OPTIONS[0].description = "modified"
