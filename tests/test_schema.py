@@ -144,21 +144,26 @@ class TestEnrichToolSchema:
         class MockTool:
             def __init__(self, parameters):
                 self.parameters = parameters
+
         return MockTool(params)
 
     def _make_mock_mcp(self, tool_name, tool):
         class MockToolManager:
             def __init__(self):
                 self._tools = {tool_name: tool}
+
         class MockMCP:
             def __init__(self):
                 self._tool_manager = MockToolManager()
+
         return MockMCP()
 
     def test_adds_descriptions(self):
-        tool = self._make_mock_tool({
-            "properties": {"sort": {}, "force": {}},
-        })
+        tool = self._make_mock_tool(
+            {
+                "properties": {"sort": {}, "force": {}},
+            }
+        )
         mcp = self._make_mock_mcp("perf_test", tool)
         options = [
             PerfOption("sort", "s", "string", "Sort by key"),
@@ -169,9 +174,11 @@ class TestEnrichToolSchema:
         assert tool.parameters["properties"]["force"]["description"] == "Don't complain"
 
     def test_does_not_overwrite_existing_descriptions(self):
-        tool = self._make_mock_tool({
-            "properties": {"sort": {"description": "Custom desc"}},
-        })
+        tool = self._make_mock_tool(
+            {
+                "properties": {"sort": {"description": "Custom desc"}},
+            }
+        )
         mcp = self._make_mock_mcp("perf_test", tool)
         options = [PerfOption("sort", "s", "string", "Sort by key")]
         enrich_tool_schema(mcp, "perf_test", options)
@@ -181,12 +188,15 @@ class TestEnrichToolSchema:
         class MockMCP:
             class _tool_manager:
                 _tools = {}
+
         enrich_tool_schema(MockMCP(), "nonexistent", [])
 
     def test_hyphenated_option_maps_to_param_name(self):
-        tool = self._make_mock_tool({
-            "properties": {"call_graph": {}},
-        })
+        tool = self._make_mock_tool(
+            {
+                "properties": {"call_graph": {}},
+            }
+        )
         mcp = self._make_mock_mcp("perf_test", tool)
         options = [PerfOption("call-graph", "g", "string", "Call graph options")]
         enrich_tool_schema(mcp, "perf_test", options)
