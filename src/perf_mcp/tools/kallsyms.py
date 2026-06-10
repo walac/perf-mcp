@@ -13,7 +13,7 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
-from perf_mcp.schema import format_result
+from perf_mcp.schema import format_result, get_tool
 
 
 def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
@@ -41,8 +41,7 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
         result = await executor.run(args)
         return format_result(result)
 
-    # Manually describe params (kallsyms has no PerfOption list)
-    tool = mcp._tool_manager._tools.get("perf_kallsyms")
+    tool = get_tool(mcp, "perf_kallsyms")
     if tool:
         props = tool.parameters.get("properties", {})
         props.setdefault("symbol", {})["description"] = "Kernel symbol name or address to look up"

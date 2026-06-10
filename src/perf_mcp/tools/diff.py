@@ -16,6 +16,7 @@ from perf_mcp.executor import PerfExecutor
 from perf_mcp.schema import (
     enrich_tool_schema,
     build_params,
+    get_tool,
     PerfOption,
     format_result,
     options_to_cli_args,
@@ -109,8 +110,7 @@ def register_tools(mcp: FastMCP, executor: PerfExecutor) -> None:
 
     enrich_tool_schema(mcp, "perf_diff", DIFF_OPTIONS)
 
-    # Manually describe positional params not in DIFF_OPTIONS
-    tool = mcp._tool_manager._tools.get("perf_diff")
+    tool = get_tool(mcp, "perf_diff")
     if tool:
         props = tool.parameters.get("properties", {})
         props.setdefault("old_input", {})["description"] = "Path to the baseline perf.data file"

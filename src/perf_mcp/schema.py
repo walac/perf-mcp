@@ -25,6 +25,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from mcp.server.fastmcp.tools.base import Tool
+
     from perf_mcp.executor import PerfExecutor, PerfResult
 
 
@@ -162,6 +164,21 @@ def build_params(
     return params
 
 
+def get_tool(mcp: Any, tool_name: str) -> Tool | None:
+    """Look up a registered tool by name.
+
+    Wraps FastMCP's private ``_tool_manager._tools`` dict so the rest
+    of the codebase has a single callsite to update if the internal
+    API changes.
+    """
+    return mcp._tool_manager._tools.get(tool_name)
+
+
+def get_all_tools(mcp: Any) -> dict[str, Tool]:
+    """Return all registered tools as a ``{name: Tool}`` dict."""
+    return dict(mcp._tool_manager._tools)
+
+
 def enrich_tool_schema(
     mcp: Any,
     tool_name: str,
@@ -182,7 +199,7 @@ def enrich_tool_schema(
         tool_name: The registered tool function name (e.g. ``"perf_report"``).
         options: The PerfOption list for this tool.
     """
-    tool = mcp._tool_manager._tools.get(tool_name)
+    tool = get_tool(mcp, tool_name)
     if tool is None:
         return
 

@@ -8,9 +8,14 @@ and error handling (invalid input paths).
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
-from perf_mcp.schema import format_result
+if TYPE_CHECKING:
+    from mcp.server.fastmcp.tools.base import Tool
+
+from perf_mcp.schema import format_result, get_all_tools, get_tool
 from perf_mcp.server import _register_all_tools, mcp
 
 
@@ -20,11 +25,11 @@ class TestToolRegistration:
         _register_all_tools()
 
     def test_tool_count(self):
-        tools = list(mcp._tool_manager._tools.values())
+        tools = list(get_all_tools(mcp).values())
         assert len(tools) == 26
 
     def test_all_tool_names(self):
-        names = sorted(t.name for t in mcp._tool_manager._tools.values())
+        names = sorted(t.name for t in get_all_tools(mcp).values())
         expected = [
             "perf_annotate",
             "perf_buildid_list",
@@ -56,7 +61,7 @@ class TestToolRegistration:
         assert names == expected
 
     def test_each_tool_has_description(self):
-        for tool in mcp._tool_manager._tools.values():
+        for tool in get_all_tools(mcp).values():
             assert tool.description, f"{tool.name} has no description"
             assert len(tool.description) > 20, f"{tool.name} description too short"
 
@@ -66,8 +71,10 @@ class TestToolExecution:
     def register(self):
         _register_all_tools()
 
-    def _get_tool(self, name: str):
-        return mcp._tool_manager._tools[name]
+    def _get_tool(self, name: str) -> Tool:
+        tool = get_tool(mcp, name)
+        assert tool is not None, f"Tool {name!r} not registered"
+        return tool
 
     @pytest.mark.asyncio
     async def test_evlist(self, perf_data):
@@ -284,8 +291,10 @@ class TestToolRunDispatch:
     def register(self):
         _register_all_tools()
 
-    def _get_tool(self, name: str):
-        return mcp._tool_manager._tools[name]
+    def _get_tool(self, name: str) -> Tool:
+        tool = get_tool(mcp, name)
+        assert tool is not None, f"Tool {name!r} not registered"
+        return tool
 
     @pytest.mark.asyncio
     async def test_evlist_via_run(self, perf_data):
