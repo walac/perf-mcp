@@ -14,11 +14,11 @@ from mcp.server.fastmcp import FastMCP
 
 from perf_mcp.executor import PerfExecutor
 from perf_mcp.schema import (
-    enrich_tool_schema,
-    build_params,
-    get_tool,
     PerfOption,
+    build_params,
+    enrich_tool_schema,
     format_result,
+    get_tool,
     options_to_cli_args,
 )
 

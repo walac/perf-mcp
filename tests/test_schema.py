@@ -309,4 +309,4 @@ class TestCommonOptions:
 
     def test_frozen_prevents_mutation(self):
         with pytest.raises(AttributeError):
-            COMMON_OPTIONS[0].description = "modified"
+            COMMON_OPTIONS[0].description = "modified"  # type: ignore[misc] # testing frozen
